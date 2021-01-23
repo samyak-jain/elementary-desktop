@@ -1,10 +1,14 @@
-use druid::{widget::Label, AppLauncher, PlatformError, Widget, WindowDesc};
+#[macro_use]
+extern crate druid;
 
-fn build_ui() -> impl Widget<()> {
-    Label::new("Hello World")
-}
+use druid::{AppLauncher, PlatformError, WindowDesc};
+use screens::{login::login_ui, LoginState};
+
+mod matrix;
+mod screens;
 
 fn main() -> Result<(), PlatformError> {
-    AppLauncher::with_window(WindowDesc::new(build_ui)).launch(())?;
+    tracing_subscriber::fmt::init();
+    AppLauncher::with_window(WindowDesc::new(login_ui)).launch(LoginState::default())?;
     Ok(())
 }
