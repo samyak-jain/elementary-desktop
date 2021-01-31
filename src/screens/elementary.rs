@@ -1,10 +1,9 @@
 use iced::{executor, keyboard, Application, Command, Subscription};
 use iced_native::Event;
-use matrix_sdk::Session;
 use num_traits::FromPrimitive;
 use std::convert::TryInto;
 
-use crate::database::connection::establish_connection;
+use crate::{database::connection::establish_connection, session::get_session};
 
 use super::{HomePage, LoginPage, Messages};
 
@@ -22,21 +21,21 @@ impl Application for Elementary {
 
     fn new(_flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
         let conn = establish_connection();
-        let session_result = crate::database::session::get_session(&conn);
+        let session_result = get_session();
 
         match session_result {
-            Ok(session) => {
+            Ok(Some(session)) => {
                 let command = Command::perform(
-                    async move { crate::matrix::login::restore_login("", Session { ..session }).await },
+                    async move { crate::matrix::login::restore_login("", session).await },
                     |result| match result {
                         Ok((client, session)) => Self::Message::LoginResult(client, session),
                         Err(e) => Self::Message::LoginFailed(e.to_string()),
                     },
                 );
 
-                (Elementary::HomePage(HomePage::default()), Command::none())
+                (Elementary::HomePage(HomePage::default()), command)
             }
-            Err(_) => (Elementary::LoginPage(LoginPage::default()), Command::none()),
+            _ => (Elementary::LoginPage(LoginPage::default()), Command::none()),
         }
     }
 
@@ -121,6 +120,7 @@ impl Application for Elementary {
                         println!("Logged In, {:#?}", client);
                         *self = Elementary::HomePage(HomePage {
                             client: Some(client),
+                            session: Some(session),
                             ..HomePage::default()
                         })
                     }

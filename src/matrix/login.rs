@@ -11,6 +11,8 @@ use matrix_sdk::{
 };
 use url::Url;
 
+use crate::session::write_session;
+
 pub async fn restore_login(
     homeserver: &str,
     saved_session: Session,
@@ -141,5 +143,6 @@ pub async fn login(
         })
         .await;
 
+    write_session(&session)?;
     Ok((client, session))
 }

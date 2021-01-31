@@ -1,8 +1,10 @@
+use std::collections::BTreeMap;
+
 use diesel::SqliteConnection;
 use iced::{button, text_input};
-use matrix_sdk::{Client, Session};
+use matrix_sdk::{identifiers::RoomId, Client, Session};
 
-use crate::{database::connection::establish_connection, theme::style};
+use crate::{database::connection::establish_connection, matrix::room::RoomEntry, theme::style};
 
 pub mod elementary;
 pub mod home;
@@ -24,6 +26,7 @@ pub struct HomePage {
     conn: SqliteConnection,
     client: Option<Client>,
     session: Option<Session>,
+    rooms: BTreeMap<RoomId, RoomEntry>,
 }
 
 impl Default for HomePage {
@@ -32,6 +35,7 @@ impl Default for HomePage {
             conn: establish_connection(),
             client: None,
             session: None,
+            rooms: BTreeMap::new(),
         }
     }
 }

@@ -1,5 +1,8 @@
+use std::convert::TryFrom;
+
 use crate::schema::matrix_session;
 use diesel::prelude::*;
+use matrix_sdk::identifiers::UserId;
 
 #[derive(Queryable)]
 pub struct Session {
@@ -14,6 +17,16 @@ pub struct NewSession {
     pub user_id: String,
     pub access_token: String,
     pub device_id: String,
+}
+
+impl Into<matrix_sdk::Session> for Session {
+    fn into(self) -> matrix_sdk::Session {
+        matrix_sdk::Session {
+            access_token: self.access_token,
+            user_id: UserId::try_from(self.user_id).unwrap(),
+            device_id: self.device_id,
+        }
+    }
 }
 
 pub fn add_session(

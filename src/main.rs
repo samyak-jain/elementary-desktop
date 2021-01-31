@@ -4,6 +4,9 @@ extern crate num_derive;
 #[macro_use]
 extern crate diesel;
 
+#[macro_use]
+extern crate async_stream;
+
 use iced::{Application, Settings};
 use screens::elementary::Elementary;
 
@@ -11,6 +14,7 @@ mod database;
 mod matrix;
 mod schema;
 mod screens;
+mod session;
 mod theme;
 
 fn main() -> iced::Result {
