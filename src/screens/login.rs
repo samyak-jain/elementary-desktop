@@ -1,84 +1,90 @@
-use druid::{
-    text::format::{Formatter, Validation, ValidationError},
-    widget::{Button, Flex, Svg, SvgData, TextBox, Widget, WidgetExt},
-};
+use super::{LoginPage, Messages};
+use iced::{Button, Column, Container, Length, Row, Svg, Text, TextInput};
+use num_traits::FromPrimitive;
 
-use druid::UnitPoint;
-use url::Url;
-
-use crate::matrix::login::login;
-
-use super::{LoginState, TEXTBOX_HEIGHT, TEXTBOX_VERTICAL_SPACING, TEXTBOX_WIDTH};
-
-use futures::executor;
-
-struct UrlFormatter;
-
-impl Formatter<String> for UrlFormatter {
-    fn format(&self, value: &String) -> String {
-        String::from(value)
-    }
-
-    fn validate_partial_input(&self, _input: &str, _sel: &druid::text::Selection) -> Validation {
-        Validation::success()
-    }
-
-    fn value(&self, input: &str) -> Result<String, ValidationError> {
-        match Url::parse(input) {
-            Ok(url) => Ok(url.to_string()),
-            Err(err) => Err(ValidationError::new(err)),
-        }
-    }
+#[derive(FromPrimitive)]
+pub enum TextBoxes {
+    Homeserver = 0,
+    Username,
+    Password,
 }
 
-pub fn login_ui() -> impl Widget<LoginState> {
-    let matrix_logo = match include_str!("../resources/matrix-logo.svg").parse::<SvgData>() {
-        Ok(svg) => svg,
-        Err(_) => SvgData::default(), // TODO: Handle Error
-    };
+impl LoginPage {
+    pub fn set_focus(&mut self, to_focus: TextBoxes) {
+        self.homerserver_state.unfocus();
+        self.username_state.unfocus();
+        self.password_state.unfocus();
+        match to_focus {
+            TextBoxes::Homeserver => self.homerserver_state.focus(),
+            TextBoxes::Username => self.username_state.focus(),
+            TextBoxes::Password => self.password_state.focus(),
+        }
+    }
 
-    let intro = Svg::new(matrix_logo).align_horizontal(UnitPoint::CENTER);
+    pub fn view(&mut self) -> iced::Element<'_, Messages> {
+        let svg = Svg::from_path(format!(
+            "{}/src/resources/matrix-logo.svg",
+            env!("CARGO_MANIFEST_DIR")
+        ));
 
-    let form = Flex::column()
-        .with_child(
-            TextBox::new()
-                .with_placeholder("Enter Homeserver URL")
-                .with_formatter(UrlFormatter)
-                .lens(LoginState::homeserver_url)
-                .fix_width(TEXTBOX_WIDTH)
-                .fix_height(TEXTBOX_HEIGHT),
-        )
-        .with_spacer(TEXTBOX_VERTICAL_SPACING)
-        .with_child(
-            TextBox::new()
-                .with_placeholder("Username")
-                .lens(LoginState::username)
-                .fix_width(TEXTBOX_WIDTH)
-                .fix_height(TEXTBOX_HEIGHT),
-        )
-        .with_spacer(TEXTBOX_VERTICAL_SPACING)
-        .with_child(
-            TextBox::new()
-                .with_placeholder("Password")
-                .lens(LoginState::password)
-                .fix_width(TEXTBOX_WIDTH)
-                .fix_height(TEXTBOX_HEIGHT),
-        )
-        .with_spacer(TEXTBOX_VERTICAL_SPACING)
-        .with_child(
-            Button::new("Login")
-                .on_click(|_ctx, data: &mut LoginState, _env| {
-                    executor::block_on(login(&data.homeserver_url, &data.username, &data.password))
-                        .unwrap();
-                })
-                .fix_width(TEXTBOX_WIDTH)
-                .fix_height(TEXTBOX_HEIGHT),
-        )
-        .align_vertical(UnitPoint::CENTER)
-        .align_horizontal(UnitPoint::CENTER);
+        let matrix_logo = Container::new(svg)
+            .padding(50)
+            .center_x()
+            .center_y()
+            .height(Length::Fill)
+            .width(Length::FillPortion(1))
+            .style(self.theme);
 
-    Flex::row()
-        .main_axis_alignment(druid::widget::MainAxisAlignment::Center)
-        .with_flex_child(intro, 1.0)
-        .with_flex_child(form.expand(), 1.0)
+        let login_form = Container::new(
+            Column::new()
+                .padding(70)
+                .spacing(20)
+                .push(
+                    TextInput::new(
+                        &mut self.homerserver_state,
+                        "Enter Homeserver URL...",
+                        &self.homeserver_url,
+                        Messages::HomeserverChanged,
+                    )
+                    .size(15)
+                    .padding(12)
+                    .style(self.theme),
+                )
+                .push(
+                    TextInput::new(
+                        &mut self.username_state,
+                        "Enter Username...",
+                        &self.username,
+                        Messages::UsernameChanged,
+                    )
+                    .size(15)
+                    .padding(12)
+                    .style(self.theme),
+                )
+                .push(
+                    TextInput::new(
+                        &mut self.password_state,
+                        "Enter Password...",
+                        &self.password,
+                        Messages::PasswordChanged,
+                    )
+                    .password()
+                    .size(15)
+                    .padding(12)
+                    .style(self.theme),
+                )
+                .push(
+                    Button::new(&mut self.button_state, Text::new("Login"))
+                        .on_press(Messages::Submit),
+                ),
+        )
+        .height(Length::Fill)
+        .width(Length::FillPortion(1))
+        .center_y();
+
+        Container::new(Row::new().push(matrix_logo).push(login_form))
+            .height(Length::Fill)
+            .style(self.theme)
+            .into()
+    }
 }

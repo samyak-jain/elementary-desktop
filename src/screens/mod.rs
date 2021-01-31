@@ -1,14 +1,49 @@
-use druid::Lens;
+use diesel::SqliteConnection;
+use iced::{button, text_input};
+use matrix_sdk::{Client, Session};
 
+use crate::{database::connection::establish_connection, theme::style};
+
+pub mod elementary;
+pub mod home;
 pub mod login;
 
-#[derive(Clone, Data, Lens, Default)]
-pub struct LoginState {
+#[derive(Default)]
+pub struct LoginPage {
+    theme: style::Theme,
+    homerserver_state: text_input::State,
     homeserver_url: String,
+    username_state: text_input::State,
     username: String,
+    password_state: text_input::State,
     password: String,
+    button_state: button::State,
 }
 
-const TEXTBOX_WIDTH: f64 = 400.0;
-const TEXTBOX_HEIGHT: f64 = 50.0;
-const TEXTBOX_VERTICAL_SPACING: f64 = 50.0;
+pub struct HomePage {
+    conn: SqliteConnection,
+    client: Option<Client>,
+    session: Option<Session>,
+}
+
+impl Default for HomePage {
+    fn default() -> Self {
+        Self {
+            conn: establish_connection(),
+            client: None,
+            session: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Messages {
+    HomeserverChanged(String),
+    UsernameChanged(String),
+    PasswordChanged(String),
+    FocusNext,
+    FocusPrev,
+    Submit,
+    LoginResult(Client, Session),
+    LoginFailed(String),
+}

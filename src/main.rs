@@ -1,14 +1,19 @@
 #[macro_use]
-extern crate druid;
+extern crate num_derive;
 
-use druid::{AppLauncher, PlatformError, WindowDesc};
-use screens::{login::login_ui, LoginState};
+#[macro_use]
+extern crate diesel;
 
+use iced::{Application, Settings};
+use screens::elementary::Elementary;
+
+mod database;
 mod matrix;
+mod schema;
 mod screens;
+mod theme;
 
-fn main() -> Result<(), PlatformError> {
+fn main() -> iced::Result {
     tracing_subscriber::fmt::init();
-    AppLauncher::with_window(WindowDesc::new(login_ui)).launch(LoginState::default())?;
-    Ok(())
+    Elementary::run(Settings::default())
 }
