@@ -31,34 +31,12 @@ impl HomePage {
             Messages::Sync(event) => match event {
                 MatrixEvents::Room(room_event) => match room_event {
                     matrix_sdk::events::AnyRoomEvent::Message(message_event) => {
-                        let room = self
-                            .rooms
-                            .entry(message_event.room_id().clone())
-                            .or_default();
-
                         //room.messages.push(AnyRoomEvent::Message(message_event.clone()));
 
                         let mut commands = Vec::new();
-                        match message_event.clone() {
-                            AnyMessageEvent::Reaction(_) => {}
-                            AnyMessageEvent::RoomEncrypted(_) => {}
-                            AnyMessageEvent::RoomMessage(message) => {
-                                if let MessageEventContent::Image(image_message_content) =
-                                    message.clone().content
-                                {
-                                    if let Some(image_url) = image_message_content.url {
-                                        commands.push(
-                                            async move { Messages::FetchImage(image_url) }.into(),
-                                        );
-                                    }
-                                }
-                                room.message_list.push(message);
-                            }
-                            AnyMessageEvent::RoomMessageFeedback(_) => {}
-                            AnyMessageEvent::RoomRedaction(_) => {}
-                            AnyMessageEvent::Sticker(_) => {}
-                            _ => {}
-                        };
+                        let send_message_event = message_event.clone();
+                        commands
+                            .push(async move { Messages::RoomMessage(send_message_event) }.into());
 
                         if self.selected.as_ref() == Some(message_event.room_id()) {
                             let client = self.client.clone();
@@ -80,8 +58,6 @@ impl HomePage {
 
                             commands.push(marker_cmd.into());
                         };
-
-                        println!("commands: {:#?}", commands);
 
                         return Command::batch(commands);
                     }
@@ -168,6 +144,33 @@ impl HomePage {
                 },
                 MatrixEvents::ToDevice(_) => {}
             },
+            Messages::RoomMessage(message_event) => {
+                let room = self
+                    .rooms
+                    .entry(message_event.room_id().clone())
+                    .or_default();
+
+                match message_event.clone() {
+                    AnyMessageEvent::Reaction(_) => {}
+                    AnyMessageEvent::RoomEncrypted(_) => {}
+                    AnyMessageEvent::RoomMessage(message) => {
+                        println!("Message: {:#?}", message);
+
+                        room.message_list.push(message.clone());
+                        println!("Message List: {:#?}", room.message_list);
+
+                        if let MessageEventContent::Image(image_message_content) = message.content {
+                            if let Some(image_url) = image_message_content.url {
+                                return async move { Messages::FetchImage(image_url) }.into();
+                            }
+                        }
+                    }
+                    AnyMessageEvent::RoomMessageFeedback(_) => {}
+                    AnyMessageEvent::RoomRedaction(_) => {}
+                    AnyMessageEvent::Sticker(_) => {}
+                    _ => {}
+                };
+            }
             Messages::ResetRoom(id, room) => {
                 self.rooms.insert(id.clone(), room);
                 return async move { Messages::BackFill(id) }.into();
@@ -219,21 +222,37 @@ impl HomePage {
                 if let Some(end) = response.end {
                     room.messages.end = Some(end);
                 }
-                println!("Events: {:#?}", events);
+                //println!("Events: {:#?}", events);
+                //let commands: Vec<Command<_>> = events
+                //    .iter()
+                //    .filter_map(|e| e.image_url())
+                //    .map(|url| {
+                //        async {
+                //            println!("URL Back: {}", url);
+                //            Messages::FetchImage(url)
+                //        }
+                //        .into()
+                //    })
+                //    .collect();
+                //room.messages.append(events);
+
                 let commands: Vec<Command<_>> = events
                     .iter()
-                    .filter_map(|e| e.image_url())
-                    .map(|url| {
-                        async {
-                            println!("URL Back: {}", url);
-                            Messages::FetchImage(url)
+                    .filter_map(|event| {
+                        if let AnyRoomEvent::Message(message_event) = event {
+                            let message_event_clone = message_event.clone();
+                            return Some(
+                                    async move {
+                                        Messages::RoomMessage(message_event_clone.to_owned())
+                                    }
+                                    .into(),
+                                );
+                        } else {
+                            None
                         }
-                        .into()
                     })
                     .collect();
-                room.messages.append(events);
 
-                println!("Commands2: {:#?}", commands);
                 return Command::batch(commands);
             }
             Messages::FetchImage(url) => {
@@ -441,6 +460,8 @@ impl HomePage {
             // mxid of most recent sender
             let mut last_sender: Option<UserId> = None;
             // Messages
+
+            println!("View Message List: {:#?}", room.message_list);
             for message in room.message_list.iter() {
                 let mut message_container = Column::new();
 

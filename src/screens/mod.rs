@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use diesel::SqliteConnection;
 use iced::{button, text_input};
-use matrix_sdk::{identifiers::RoomId, Client, Session};
+use matrix_sdk::{events::AnyMessageEvent, identifiers::RoomId, Client, Session};
 
 use crate::{
     matrix::{room::RoomEntry, subscriber::MatrixEvents},
@@ -67,4 +67,5 @@ pub enum Messages {
     SelectRoom(RoomId),
     SetMessage(String),
     SendMessage,
+    RoomMessage(AnyMessageEvent),
 }
