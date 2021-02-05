@@ -1,11 +1,10 @@
+#![feature(destructuring_assignment)]
+
 #[macro_use]
 extern crate num_derive;
 
 #[macro_use]
 extern crate diesel;
-
-#[macro_use]
-extern crate async_stream;
 
 use iced::{Application, Settings};
 use screens::elementary::Elementary;

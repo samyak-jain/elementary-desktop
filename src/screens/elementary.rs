@@ -1,9 +1,7 @@
 use iced::{executor, keyboard, Application, Command, Subscription};
 use iced_native::Event;
-use num_traits::FromPrimitive;
-use std::convert::TryInto;
 
-use crate::{database::connection::establish_connection, session::get_session};
+use crate::{matrix::subscriber::MatrixSync, session::get_session};
 
 use super::{HomePage, LoginPage, Messages};
 
@@ -20,20 +18,19 @@ impl Application for Elementary {
     type Flags = ();
 
     fn new(_flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
-        let conn = establish_connection();
         let session_result = get_session();
 
         match session_result {
             Ok(Some(session)) => {
                 let command = Command::perform(
-                    async move { crate::matrix::login::restore_login("", session).await },
+                    async move { crate::matrix::login::restore_login(session).await },
                     |result| match result {
                         Ok((client, session)) => Self::Message::LoginResult(client, session),
                         Err(e) => Self::Message::LoginFailed(e.to_string()),
                     },
                 );
 
-                (Elementary::HomePage(HomePage::default()), command)
+                (Elementary::LoginPage(LoginPage::default()), command)
             }
             _ => (Elementary::LoginPage(LoginPage::default()), Command::none()),
         }
@@ -44,93 +41,43 @@ impl Application for Elementary {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        iced_native::subscription::events_with(
-            |event: iced_native::Event, _status| -> Option<Self::Message> {
-                match event {
-                    Event::Keyboard(keyboard_event) => match keyboard_event {
-                        keyboard::Event::KeyPressed {
-                            key_code: keyboard::KeyCode::Tab,
-                            modifiers,
-                        } => Some(if modifiers.shift {
-                            Self::Message::FocusPrev
-                        } else {
-                            Self::Message::FocusNext
-                        }),
+        match self {
+            Elementary::LoginPage(_) => iced_native::subscription::events_with(
+                |event: iced_native::Event, _status| -> Option<Self::Message> {
+                    match event {
+                        Event::Keyboard(keyboard_event) => match keyboard_event {
+                            keyboard::Event::KeyPressed {
+                                key_code: keyboard::KeyCode::Tab,
+                                modifiers,
+                            } => Some(if modifiers.shift {
+                                Self::Message::FocusPrev
+                            } else {
+                                Self::Message::FocusNext
+                            }),
+                            _ => None,
+                        },
                         _ => None,
-                    },
-                    _ => None,
-                }
-            },
-        )
+                    }
+                },
+            ),
+            Elementary::HomePage(home) => {
+                MatrixSync::subscription(home.client.clone()).map(Self::Message::Sync)
+            }
+        }
     }
 
     fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
         match self {
             Elementary::LoginPage(login) => {
-                let textboxes = [
-                    &login.homerserver_state,
-                    &login.username_state,
-                    &login.password_state,
-                ];
-
-                match message {
-                    Self::Message::HomeserverChanged(input) => login.homeserver_url = input,
-                    Self::Message::UsernameChanged(input) => login.username = input,
-                    Self::Message::PasswordChanged(input) => login.password = input,
-                    Self::Message::FocusNext => {
-                        let focus_index = textboxes.iter().position(|textbox| textbox.is_focused());
-                        if let Some(unwrapped_focus_index) = focus_index {
-                            if unwrapped_focus_index < textboxes.len() {
-                                if let Some(textbox) = FromPrimitive::from_i32(
-                                    (unwrapped_focus_index + 1).try_into().unwrap(),
-                                ) {
-                                    login.set_focus(textbox);
-                                }
-                            }
-                        }
-                    }
-                    Self::Message::FocusPrev => {
-                        let focus_index = textboxes.iter().position(|textbox| textbox.is_focused());
-                        if let Some(unwrapped_focus_index) = focus_index {
-                            if 0 < unwrapped_focus_index {
-                                if let Some(textbox) = FromPrimitive::from_i32(
-                                    (unwrapped_focus_index - 1).try_into().unwrap(),
-                                ) {
-                                    login.set_focus(textbox);
-                                }
-                            }
-                        }
-                    }
-                    Self::Message::Submit => {
-                        let homeser = login.homeserver_url.clone();
-                        let user = login.username.clone();
-                        let pass = login.password.clone();
-
-                        return Command::perform(
-                            async move { crate::matrix::login::login(&homeser, &user, &pass).await },
-                            |result| match result {
-                                Ok((client, session)) => {
-                                    Self::Message::LoginResult(client, session)
-                                }
-                                Err(e) => Self::Message::LoginFailed(e.to_string()),
-                            },
-                        );
-                    }
-                    Self::Message::LoginResult(client, session) => {
-                        println!("Logged In, {:#?}", client);
-                        *self = Elementary::HomePage(HomePage {
-                            client: Some(client),
-                            session: Some(session),
-                            ..HomePage::default()
-                        })
-                    }
-                    Self::Message::LoginFailed(e) => println!("Login Failed, {:#?}", e),
+                let (command, home_page) = login.update(message);
+                if let Some(home) = home_page {
+                    *self = Elementary::HomePage(home);
                 }
-            }
-            Elementary::HomePage(_) => {}
-        }
 
-        Command::none()
+                command
+            }
+            Elementary::HomePage(home) => home.update(message),
+        }
     }
 
     fn view(&mut self) -> iced::Element<'_, Self::Message> {

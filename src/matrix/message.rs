@@ -1,12 +1,27 @@
 use std::{collections::HashSet, time::SystemTime};
 
+use anyhow::Error;
 use matrix_sdk::{
     events::{
         room::message::{MessageEventContent, Relation, TextMessageEventContent},
         AnyMessageEvent, AnyRoomEvent, AnyStateEvent, MessageEvent,
     },
-    identifiers::EventId,
+    identifiers::{EventId, ServerName},
 };
+use std::convert::TryFrom;
+use url::Url;
+
+pub fn parse_mxc(url: &str) -> Result<(Box<ServerName>, String), Error> {
+    let url = Url::parse(&url)?;
+    anyhow::ensure!(url.scheme() == "mxc", "Not an mxc url");
+    let host = url.host_str().ok_or_else(|| anyhow::anyhow!("url"))?;
+    let server_name: Box<ServerName> = <&ServerName>::try_from(host)?.into();
+    let path = url.path_segments().and_then(|mut p| p.next());
+    match path {
+        Some(path) => Ok((server_name, path.to_owned())),
+        _ => Err(anyhow::anyhow!("Invalid mxc url")),
+    }
+}
 
 pub trait AnyMessageEventExt {
     fn image_url(&self) -> Option<String>;
@@ -61,17 +76,17 @@ impl AnyRoomEventExt for AnyRoomEvent {
 #[derive(Clone, Debug)]
 pub struct MessageBuffer {
     /// The messages we have stored
-    messages: Vec<AnyRoomEvent>,
+    pub messages: Vec<AnyRoomEvent>,
     /// Set of event id's we have
     known_ids: HashSet<EventId>,
     /// Token for the start of the messages we have
-    start: Option<String>,
+    pub start: Option<String>,
     /// Token for the end of the messages we have
-    end: Option<String>,
+    pub end: Option<String>,
     /// Most recent activity in the room
-    updated: std::time::SystemTime,
+    pub updated: std::time::SystemTime,
     /// Whether we're awaiting for backfill to be received
-    loading: bool,
+    pub loading: bool,
 }
 
 impl MessageBuffer {

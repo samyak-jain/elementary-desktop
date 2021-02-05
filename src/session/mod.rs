@@ -1,6 +1,25 @@
 use std::io;
 
-use matrix_sdk::Session;
+use matrix_sdk::identifiers::{DeviceId, UserId};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Session {
+    pub access_token: String,
+    pub user_id: UserId,
+    pub device_id: Box<DeviceId>,
+    pub homeserver: String,
+}
+
+impl From<Session> for matrix_sdk::Session {
+    fn from(s: Session) -> Self {
+        Self {
+            access_token: s.access_token,
+            user_id: s.user_id,
+            device_id: s.device_id,
+        }
+    }
+}
 
 fn session_path() -> std::path::PathBuf {
     std::path::PathBuf::from("./data/config/session.toml")

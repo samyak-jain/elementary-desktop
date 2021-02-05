@@ -38,6 +38,18 @@ impl container::StyleSheet for Container {
     }
 }
 
+pub struct RoomContainer;
+
+impl container::StyleSheet for RoomContainer {
+    fn style(&self) -> container::Style {
+        container::Style {
+            background: Color::from_rgb(0.15, 0.15, 0.15).into(),
+            text_color: Color::WHITE.into(),
+            ..container::Style::default()
+        }
+    }
+}
+
 pub struct Radio;
 
 impl radio::StyleSheet for Radio {
@@ -127,6 +139,34 @@ impl button::StyleSheet for Button {
         }
     }
 }
+
+//pub struct RoomButton;
+//
+//impl button::StyleSheet for RoomButton {
+//    fn active(&self) -> button::Style {
+//        button::Style {
+//            background: ACTIVE.into(),
+//            text_color: Color::WHITE,
+//            ..button::Style::default()
+//        }
+//    }
+//
+//    fn hovered(&self) -> button::Style {
+//        button::Style {
+//            background: HOVERED.into(),
+//            text_color: Color::WHITE,
+//            ..self.active()
+//        }
+//    }
+//
+//    fn pressed(&self) -> button::Style {
+//        button::Style {
+//            border_width: 1.0,
+//            border_color: Color::WHITE,
+//            ..self.hovered()
+//        }
+//    }
+//}
 
 pub struct Scrollable;
 

@@ -1,4 +1,11 @@
-use matrix_sdk::identifiers::{RoomAliasId, UserId};
+use std::collections::BTreeMap;
+
+use futures::executor::block_on;
+use matrix_sdk::{
+    events::{room::message::MessageEventContent, MessageEvent},
+    identifiers::{RoomAliasId, RoomId, UserId},
+    Client, JoinedRoom,
+};
 
 use super::message::MessageBuffer;
 
@@ -18,6 +25,8 @@ pub struct RoomEntry {
     pub direct: Option<UserId>,
     /// Cache of messages
     pub messages: MessageBuffer,
+
+    pub message_list: Vec<MessageEvent<MessageEventContent>>,
 }
 
 impl RoomEntry {
@@ -31,4 +40,36 @@ impl RoomEntry {
             ..Default::default()
         }
     }
+}
+
+pub fn partition_rooms<'a>(
+    rooms: &'a BTreeMap<RoomId, RoomEntry>,
+    client: &Client,
+) -> (
+    Vec<(&'a RoomId, &'a RoomEntry)>,
+    Vec<(&'a RoomId, &'a RoomEntry)>,
+) {
+    rooms
+        .iter()
+        // Hide if we're in the room the tombstone points to
+        .filter(|(id, _)| {
+            !client
+                .get_joined_room(id)
+                .and_then(|j| j.tombstone())
+                .map(|t| rooms.contains_key(&t.replacement_room))
+                .unwrap_or(false)
+        })
+        .partition(|(_, room)| room.direct.is_some())
+}
+
+pub fn get_sender_details(user: UserId, room: JoinedRoom) -> (String, Option<String>) {
+    match block_on(async { room.get_member(&user).await.unwrap() }) {
+        Some(member) => {
+            return (
+                String::from(member.name()),
+                member.avatar_url().map(|url| String::from(url)),
+            );
+        }
+        None => return (String::from("Unknown Sender"), None),
+    };
 }

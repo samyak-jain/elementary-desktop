@@ -11,6 +11,7 @@ pub struct MatrixSync {
     join: Option<tokio::task::JoinHandle<()>>,
 }
 
+#[derive(Debug, Clone)]
 pub enum MatrixEvents {
     Room(AnyRoomEvent),
     ToDevice(AnyToDeviceEvent),

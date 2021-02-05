@@ -4,7 +4,12 @@ use diesel::SqliteConnection;
 use iced::{button, text_input};
 use matrix_sdk::{identifiers::RoomId, Client, Session};
 
-use crate::{database::connection::establish_connection, matrix::room::RoomEntry, theme::style};
+use crate::{
+    matrix::{room::RoomEntry, subscriber::MatrixEvents},
+    theme::style,
+};
+
+use matrix_sdk::api::r0::message::get_message_events::Response as MessageResponse;
 
 pub mod elementary;
 pub mod home;
@@ -23,21 +28,23 @@ pub struct LoginPage {
 }
 
 pub struct HomePage {
+    theme: style::Theme,
     conn: SqliteConnection,
-    client: Option<Client>,
-    session: Option<Session>,
+    client: Client,
+    session: Session,
     rooms: BTreeMap<RoomId, RoomEntry>,
-}
-
-impl Default for HomePage {
-    fn default() -> Self {
-        Self {
-            conn: establish_connection(),
-            client: None,
-            session: None,
-            rooms: BTreeMap::new(),
-        }
-    }
+    selected: Option<RoomId>,
+    sync_token: String,
+    images: BTreeMap<String, iced::image::Handle>,
+    dm_buttons: Vec<iced::button::State>,
+    group_buttons: Vec<iced::button::State>,
+    room_scroll: iced::scrollable::State,
+    message_scroll: iced::scrollable::State,
+    backfill_button: iced::button::State,
+    tombstone_button: iced::button::State,
+    message_input: iced::text_input::State,
+    draft: String,
+    send_button: iced::button::State,
 }
 
 #[derive(Debug, Clone)]
@@ -50,4 +57,14 @@ pub enum Messages {
     Submit,
     LoginResult(Client, Session),
     LoginFailed(String),
+    Sync(MatrixEvents),
+    FetchImage(String),
+    FetchedImage(String, iced::image::Handle),
+    RoomName(RoomId, String),
+    ResetRoom(RoomId, RoomEntry),
+    BackFill(RoomId),
+    BackFilled(RoomId, MessageResponse),
+    SelectRoom(RoomId),
+    SetMessage(String),
+    SendMessage,
 }
