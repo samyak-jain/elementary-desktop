@@ -7,7 +7,7 @@ use matrix_sdk::{
     events::{
         room::message::MessageEventContent, AnySyncMessageEvent, AnySyncRoomEvent, AnyToDeviceEvent,
     },
-    Client, ClientConfig, LoopCtrl, SyncSettings,
+    Client, ClientConfig, LoopCtrl, Sas, SyncSettings,
 };
 use url::Url;
 

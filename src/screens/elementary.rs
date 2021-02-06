@@ -3,11 +3,12 @@ use iced_native::Event;
 
 use crate::{matrix::subscriber::MatrixSync, session::get_session};
 
-use super::{HomePage, LoginPage, Messages};
+use super::{HomePage, LoginPage, Messages, VerifyPage};
 
 pub enum Elementary {
     LoginPage(LoginPage),
     HomePage(HomePage),
+    VerifyPage(VerifyPage),
 }
 
 impl Application for Elementary {
@@ -63,20 +64,31 @@ impl Application for Elementary {
             Elementary::HomePage(home) => {
                 MatrixSync::subscription(home.client.clone()).map(Self::Message::Sync)
             }
+            Elementary::VerifyPage(verify) => {
+                MatrixSync::subscription(verify.client.clone()).map(Self::Message::Sync)
+            }
         }
     }
 
     fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
         match self {
             Elementary::LoginPage(login) => {
-                let (command, home_page) = login.update(message);
-                if let Some(home) = home_page {
-                    *self = Elementary::HomePage(home);
+                let (command, page_to_move) = login.update(message);
+                if let Some(page) = page_to_move {
+                    *self = page;
                 }
 
                 command
             }
             Elementary::HomePage(home) => home.update(message),
+            Elementary::VerifyPage(verify) => {
+                let (command, page_to_move) = verify.update(message);
+                if let Some(page) = page_to_move {
+                    *self = page;
+                }
+
+                command
+            }
         }
     }
 
@@ -84,6 +96,7 @@ impl Application for Elementary {
         match self {
             Elementary::LoginPage(login) => login.view(),
             Elementary::HomePage(home) => home.view(),
+            Elementary::VerifyPage(verify) => verify.view(),
         }
     }
 }

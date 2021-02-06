@@ -1,9 +1,9 @@
-use std::{collections::BTreeMap, convert::TryInto};
+use std::convert::TryInto;
 
 use crate::{database::connection::establish_connection, matrix::room::RoomEntry};
 
-use super::{HomePage, LoginPage, Messages};
-use iced::{Align, Button, Column, Command, Container, Length, Row, Svg, Text, TextInput};
+use super::{elementary::Elementary, HomePage, LoginPage, Messages, VerifyPage};
+use iced::{Button, Column, Command, Container, Length, Row, Svg, Text, TextInput};
 use num_traits::FromPrimitive;
 
 #[derive(FromPrimitive)]
@@ -25,7 +25,7 @@ impl LoginPage {
         }
     }
 
-    pub fn update(&mut self, message: Messages) -> (Command<Messages>, Option<HomePage>) {
+    pub fn update(&mut self, message: Messages) -> (Command<Messages>, Option<Elementary>) {
         let textboxes = [
             &self.homerserver_state,
             &self.username_state,
@@ -69,7 +69,7 @@ impl LoginPage {
                     Command::perform(
                         async move { crate::matrix::login::login(&homeser, &user, &pass).await },
                         |result| match result {
-                            Ok((client, session)) => Messages::LoginResult(client, session.into()),
+                            Ok((client, session)) => Messages::Verification(client, session.into()),
                             Err(e) => Messages::LoginFailed(e.to_string()),
                         },
                     ),
@@ -94,25 +94,21 @@ impl LoginPage {
                 }
                 return (
                     Command::batch(commands),
-                    Some(HomePage {
+                    Some(Elementary::HomePage(HomePage::new(client, session))),
+                );
+            }
+            Messages::Verification(client, session) => {
+                return (
+                    Command::none(),
+                    Some(Elementary::VerifyPage(VerifyPage {
+                        theme: Default::default(),
                         client,
                         session,
-                        conn: establish_connection(),
-                        rooms: Default::default(),
-                        selected: None,
-                        sync_token: Default::default(),
-                        images: Default::default(),
-                        theme: Default::default(),
-                        dm_buttons: Default::default(),
-                        group_buttons: Default::default(),
-                        room_scroll: Default::default(),
-                        message_scroll: Default::default(),
-                        backfill_button: Default::default(),
-                        tombstone_button: Default::default(),
-                        message_input: Default::default(),
-                        draft: Default::default(),
-                        send_button: Default::default(),
-                    }),
+                        verification_emoji: Default::default(),
+                        sas: None,
+                        accept_button_state: Default::default(),
+                        cancel_button_state: Default::default(),
+                    })),
                 );
             }
             Messages::LoginFailed(e) => println!("Login Failed, {:#?}", e),

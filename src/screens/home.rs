@@ -31,8 +31,6 @@ impl HomePage {
             Messages::Sync(event) => match event {
                 MatrixEvents::Room(room_event) => match room_event {
                     matrix_sdk::events::AnyRoomEvent::Message(message_event) => {
-                        //room.messages.push(AnyRoomEvent::Message(message_event.clone()));
-
                         let mut commands = Vec::new();
                         let send_message_event = message_event.clone();
                         commands
@@ -66,13 +64,11 @@ impl HomePage {
                             AnyStateEvent::RoomCanonicalAlias(ref alias) => {
                                 let room = self.rooms.entry(alias.room_id.clone()).or_default();
                                 room.alias = alias.content.alias.clone();
-                                //room.messages.push(AnyRoomEvent::State(event));
                             }
                             AnyStateEvent::RoomName(ref name) => {
                                 let id = name.room_id.clone();
                                 let room = self.rooms.entry(id.clone()).or_default();
                                 room.display_name = name.content.name().map(String::from);
-                                //room.messages.push(AnyRoomEvent::State(event));
                                 let client = self.client.clone();
                                 return async move {
                                     let joined = client.get_joined_room(&id).unwrap();
@@ -83,11 +79,9 @@ impl HomePage {
                             AnyStateEvent::RoomTopic(ref topic) => {
                                 let room = self.rooms.entry(topic.room_id.clone()).or_default();
                                 room.topic = topic.content.topic.clone();
-                                //room.messages.push(AnyRoomEvent::State(event));
                             }
                             AnyStateEvent::RoomAvatar(ref avatar) => {
                                 let room = self.rooms.entry(avatar.room_id.clone()).or_default();
-                                //room.messages.push(AnyRoomEvent::State(event));
                                 if let Some(url) = room.avatar.clone() {
                                     room.avatar = Some(url.clone());
                                     return async { Messages::FetchImage(url) }.into();
@@ -99,13 +93,11 @@ impl HomePage {
                                 let id = create.room_id.clone();
                                 return async move {
                                     let entry = RoomEntry::from_sdk(&joined).await;
-                                    //entry.messages.push(AnyRoomEvent::State(event));
                                     Messages::ResetRoom(id, entry)
                                 }
                                 .into();
                             }
                             AnyStateEvent::RoomMember(ref member) => {
-                                //let room = self.rooms.entry(member.room_id.clone()).or_default();
                                 let client = self.client.clone();
                                 // If we left a room, remove it from the RoomEntry list
                                 if member.state_key == self.session.user_id {
@@ -130,13 +122,8 @@ impl HomePage {
                                         _ => (),
                                     }
                                 }
-                                //room.messages.push(AnyRoomEvent::State(event));
                             }
-                            ref any => {
-                                //    Ensure room exists
-                                let room = self.rooms.entry(any.room_id().clone()).or_default();
-                                room.messages.push(AnyRoomEvent::State(event));
-                            }
+                            _ => {}
                         }
                     }
                     matrix_sdk::events::AnyRoomEvent::RedactedMessage(_) => {}
@@ -150,18 +137,31 @@ impl HomePage {
                     .entry(message_event.room_id().clone())
                     .or_default();
 
+                let mut commands = Vec::new();
+
+                if let Some(joined_room) = self
+                    .client
+                    .clone()
+                    .get_joined_room(&message_event.room_id())
+                {
+                    let user_details =
+                        get_sender_details(message_event.sender().to_owned(), joined_room);
+
+                    if let Some(image_url) = user_details.1 {
+                        commands.push(async move { Messages::FetchImage(image_url) }.into());
+                    }
+                }
+
                 match message_event.clone() {
                     AnyMessageEvent::Reaction(_) => {}
                     AnyMessageEvent::RoomEncrypted(_) => {}
                     AnyMessageEvent::RoomMessage(message) => {
-                        println!("Message: {:#?}", message);
-
                         room.message_list.push(message.clone());
-                        println!("Message List: {:#?}", room.message_list);
 
                         if let MessageEventContent::Image(image_message_content) = message.content {
                             if let Some(image_url) = image_message_content.url {
-                                return async move { Messages::FetchImage(image_url) }.into();
+                                commands
+                                    .push(async move { Messages::FetchImage(image_url) }.into());
                             }
                         }
                     }
@@ -170,6 +170,8 @@ impl HomePage {
                     AnyMessageEvent::Sticker(_) => {}
                     _ => {}
                 };
+
+                return Command::batch(commands);
             }
             Messages::ResetRoom(id, room) => {
                 self.rooms.insert(id.clone(), room);
@@ -222,19 +224,6 @@ impl HomePage {
                 if let Some(end) = response.end {
                     room.messages.end = Some(end);
                 }
-                //println!("Events: {:#?}", events);
-                //let commands: Vec<Command<_>> = events
-                //    .iter()
-                //    .filter_map(|e| e.image_url())
-                //    .map(|url| {
-                //        async {
-                //            println!("URL Back: {}", url);
-                //            Messages::FetchImage(url)
-                //        }
-                //        .into()
-                //    })
-                //    .collect();
-                //room.messages.append(events);
 
                 let commands: Vec<Command<_>> = events
                     .iter()
@@ -260,6 +249,7 @@ impl HomePage {
                     Ok((server, path)) => (server, path),
                     Err(e) => return async move { Messages::LoginFailed(e.to_string()) }.into(),
                 };
+
                 let client = self.client.clone();
                 return async move {
                     let request = ImageRequest::new(&path, &*server);
@@ -437,6 +427,7 @@ impl HomePage {
                 .scrollbar_width(2)
                 .spacing(4)
                 .height(Length::Fill);
+
             // Backfill button or loading message
             let backfill: Element<_> = if room.messages.loading {
                 Text::new("Loading...").into()
@@ -461,7 +452,6 @@ impl HomePage {
             let mut last_sender: Option<UserId> = None;
             // Messages
 
-            println!("View Message List: {:#?}", room.message_list);
             for message in room.message_list.iter() {
                 let mut message_container = Column::new();
 
@@ -475,7 +465,11 @@ impl HomePage {
                     match user_details.1 {
                         Some(image) => match ims.get(&image) {
                             Some(image_handle) => {
-                                user_row = user_row.push(Image::new(image_handle.to_owned()));
+                                user_row = user_row.push(
+                                    Image::new(image_handle.to_owned())
+                                        .width(20.into())
+                                        .height(20.into()),
+                                );
                             }
                             None => {}
                         },
