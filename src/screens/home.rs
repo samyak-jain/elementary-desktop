@@ -253,7 +253,7 @@ impl HomePage {
                 let client = self.client.clone();
                 return async move {
                     let request = ImageRequest::new(&path, &*server);
-                    let response = client.send(request).await;
+                    let response = client.send(request, None).await;
                     match response {
                         Ok(response) => Messages::FetchedImage(
                             url,
@@ -343,7 +343,8 @@ impl HomePage {
                         image_handler = Some(handle.clone());
                     }
                 }
-                let mut button_content = Row::new();
+                let mut button_content =
+                    Row::new().padding(3).spacing(5).align_items(Align::Center);
 
                 if let Some(handle) = image_handler {
                     button_content = button_content.push(
@@ -362,7 +363,8 @@ impl HomePage {
                             } else {
                                 &room.name
                             })
-                            .width(iced::Length::FillPortion(4)),
+                            .width(Length::FillPortion(4))
+                            .vertical_alignment(iced::VerticalAlignment::Center),
                         ),
                     )
                     .width(iced::Length::Fill)
@@ -410,7 +412,7 @@ impl HomePage {
                 room.name.clone()
             };
 
-            let mut title_row = Row::new().align_items(Align::Center);
+            let mut title_row = Row::new().padding(6).spacing(10).align_items(Align::Center);
             if let Some(handle) = room.avatar.as_deref().and_then(|a| ims.get(a)) {
                 title_row = title_row.push(
                     Image::new(handle.to_owned())
@@ -425,7 +427,7 @@ impl HomePage {
 
             let mut scroll = Scrollable::new(&mut self.message_scroll)
                 .scrollbar_width(2)
-                .spacing(4)
+                .spacing(10)
                 .height(Length::Fill);
 
             // Backfill button or loading message
@@ -444,6 +446,7 @@ impl HomePage {
                 col.into()
             } else {
                 Button::new(&mut self.backfill_button, Text::new("Load more messages"))
+                    .style(theme)
                     .on_press(Messages::BackFill(self.selected.clone().unwrap()))
                     .into()
             };
@@ -452,20 +455,24 @@ impl HomePage {
             let mut last_sender: Option<UserId> = None;
             // Messages
 
+            let mut message_content_col = Column::new();
+            let mut message_container = Row::new().spacing(5);
             for message in room.message_list.iter() {
-                let mut message_container = Column::new();
-
                 let sender = message.sender.clone();
 
                 if last_sender != Some(sender.clone()) {
                     last_sender = Some(sender.clone());
+                    message_container = message_container.push(message_content_col);
+                    scroll = scroll.push(message_container);
+                    message_content_col = Column::new();
+                    message_container = Row::new().spacing(5);
 
                     let user_details = get_sender_details(sender, joined.clone());
-                    let mut user_row = Row::new();
+                    //let mut user_row = Row::new().spacing(5);
                     match user_details.1 {
                         Some(image) => match ims.get(&image) {
                             Some(image_handle) => {
-                                user_row = user_row.push(
+                                message_container = message_container.push(
                                     Image::new(image_handle.to_owned())
                                         .width(20.into())
                                         .height(20.into()),
@@ -476,8 +483,9 @@ impl HomePage {
                         None => {}
                     }
 
-                    message_container =
-                        message_container.push(user_row.push(Text::new(user_details.0)));
+                    message_content_col = message_content_col.push(Text::new(user_details.0));
+                    //message_container =
+                    //    message_container.push(user_row.push(Text::new(user_details.0)).padding(5));
                 }
                 match message.content.clone() {
                     MessageEventContent::Audio(_) => {
@@ -490,7 +498,8 @@ impl HomePage {
                     MessageEventContent::Notice(_) => {}
                     MessageEventContent::ServerNotice(_) => {}
                     MessageEventContent::Text(text) => {
-                        message_container = message_container.push(Text::new(&text.body));
+                        //message_container = message_container.push(Text::new(&text.body));
+                        message_content_col = message_content_col.push(Text::new(&text.body));
                     }
                     MessageEventContent::Video(_) => {}
                     MessageEventContent::VerificationRequest(_) => {}
@@ -498,8 +507,6 @@ impl HomePage {
                         println!("Unknown message type");
                     }
                 }
-
-                scroll = scroll.push(message_container);
             }
 
             //for event in room.messages.messages.iter() {

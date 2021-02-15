@@ -20,7 +20,7 @@ impl<T> EmojiHandler<T> {
 
 const ICONS: Font = Font::External {
     name: "Icons",
-    bytes: include_bytes!("/usr/share/fonts/noto/NotoColorEmoji.ttf"),
+    bytes: include_bytes!("/usr/share/fonts/Unifont/Unifont.ttf"),
 };
 
 impl VerifyPage {

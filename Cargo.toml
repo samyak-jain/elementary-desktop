@@ -24,3 +24,4 @@ async-stream = "0.3.0"
 anyhow = "1.0.38"
 serde = { version = "1.0.123", features = ["derive"] }
 time = "0.2.25"
+comrak = "0.9.0"
